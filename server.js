@@ -5,41 +5,47 @@ const cors = require('cors');
 
 const app = express();
 
-// Usar Helmet para seguridad
-app.use(helmet());
+// Usar Helmet para seguridad, incluyendo política de contenido
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"], 
+      scriptSrc: ["'self'"],   
+      styleSrc: ["'self'"],    
+    },
+  },
+}));
 
 // Configuración de CORS
 app.use(cors());
 
 // Limitar las solicitudes a 100 por minuto por IP
 const limiter = rateLimit({
-  windowMs: 60 * 1000,
+  windowMs: 60 * 1000, 
   max: 100,
   message: 'Too many requests from this IP, please try again later.',
 });
 app.use(limiter);
 
-// Usar tu ruta para manejar las solicitudes de stock
-const stockRoutes = require('./routes/api');
-app.use('/api', stockRoutes);
+// Middleware para anonimizar IP antes de procesar las solicitudes
+app.use((req, res, next) => {
+  req.anonymizedIp = anonymizeIp(req.ip);
+  next();
+});
 
-// Función para anonimizar la IP
+// Función para anonimizar la IP (trunca los últimos dos octetos)
 function anonymizeIp(ip) {
   const parts = ip.split('.');
-  // Truncamos los dos últimos octetos para anonimizar
   parts[2] = '0';
   parts[3] = '0';
   return parts.join('.');
 }
 
-// Ruta de ejemplo para capturar IP y anonimizarla
-app.get('/some-route', (req, res) => {
-  const ip = req.ip; // Obtén la IP del cliente
-  const anonymizedIp = anonymizeIp(ip); // Anonimiza la IP antes de almacenarla
-  console.log(`IP Anonimizada: ${anonymizedIp}`);
-  res.send(`Tu IP anonimizada es: ${anonymizedIp}`);
-});
+// Importar y usar las rutas de la API
+const stockRoutes = require('./routes/api');
+app.use('/api', stockRoutes);
 
+// Servidor corriendo en el puerto 3000
 app.listen(3000, () => {
-  console.log('Server running on port 3000');
+  console.log('✅ Server running on port 3000');
 });
